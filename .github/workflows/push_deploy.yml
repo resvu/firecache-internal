@@ -1,19 +1,23 @@
 on:
   push:
     branches:
-      - "**"
-
-name: Deploy package to Github Branch
+      - master
 
 env:
   NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
+name: Deploy package to Github Branch
 jobs:
   build:
     name: Build & Deploy
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+      - name: Increase the version number from the package.json
+        run: source .github/workflows/increment-tag.sh; increase_packagejson_version
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       # Setup .npmrc file to publish to GitHub Packages
       - uses: actions/setup-node@v3
         with:
@@ -21,30 +25,16 @@ jobs:
           registry-url: 'https://npm.pkg.github.com'
           # Defaults to the user or organization that owns the workflow file
           scope: '@octocat'
-      - run: npm ci
-      - run: npm publish
+      - name: Install dependencies (using package-lock.json)
+        run: npm ci
+      - name: Build Lib
+        run: npm run build
+      - name: Deploy to GPR 🚀
+        run: npm publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      # - name: Checkout 🛎️
-      #   uses: actions/checkout@v2
-      # - name: Use Node.js 16.18
-      #   uses: actions/setup-node@v1
-      #   with:
-      #     node-version: 16.18
-      # - name: Cache node_modules
-      #   id: cache-modules
-      #   uses: actions/cache@v1
-      #   with:
-      #     path: node_modules
-      #     key: ${{ runner.OS }}-build-${{ hashFiles('package.json') }}
-      # - name: Install Dependencies
-      #   if: steps.cache-modules.outputs.cache-hit != 'true'
-      #   run: npm install
-      # - name: Build Lib
-      #   run: npm run build
-      # - name: Deploy to GPR 🚀
-      #   uses: mikeal/merge-release@master
-      #   env:
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      #     NPM_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      #     NPM_REGISTRY_URL: https://npm.pkg.github.com/
+      - name: Increase the version number from the package.json
+        run: export NEW_VERSION="${{ env.NEW_VERSION }}" && source .github/workflows/increment-tag.sh; increase_github_tag
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
